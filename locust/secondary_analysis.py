@@ -1,11 +1,11 @@
 import copy
 import json
+import logging
 import os
 import sys
 import time
 from collections import deque
 
-import logging
 import requests
 from locust import TaskSet, HttpLocust, task
 
@@ -22,9 +22,16 @@ FILE_DIRECTORY = f'{BASE_DIRECTORY}/files/secondary_analysis'
 class Resource(object):
 
     _links = None
+    _content = None
 
     def __init__(self, links):
         self._links = links
+
+    @staticmethod
+    def from_json(source):
+        resource = Resource(source.get('_links'))
+        resource._content = source.get('content')
+        return resource
 
     def get_link(self, path):
         return self._links[path]['href']
@@ -116,6 +123,31 @@ class SecondarySubmission(TaskSet):
 
     def on_start(self):
         self._core_client = CoreClient(self.client)
+        self._setup_input_bundle()
+
+    def _setup_input_bundle(self):
+        core_client = CoreClient(self.client)
+        submission = core_client.create_submission()
+        files_link = submission.get_link('files')
+        for count in range(0, 2):
+            file_name = f'input_file_{"%02d" % count}.fastq.gz'
+            dummy_file = _create_test_file(file_name)
+            response = self.client.post(files_link, json=dummy_file, name='set up input file')
+            logging.info('Accessioning input file...')
+            file_resource = Resource(response.json().get('_links'))
+            file = self._retrieve_file(file_resource.get_link('self'))
+
+    def _retrieve_file(self, file_link):
+        file = None
+        file_json = None
+        group_name = 'retrieve file; wait for accessioning'
+        while not (file_json and file_json['uuid']):
+            file_json = self.client.get(file_link, name=group_name).json()
+            if file_json:
+                file = Resource.from_json(file_json)
+            else:
+                time.sleep(.500)
+        return file
 
     def on_stop(self):
         _authenticator.end_session()
@@ -187,12 +219,6 @@ class FileUpload(TaskSet):
 
 class GreenBox(HttpLocust):
     task_set = SecondarySubmission
-
-    def setup(self):
-        pass
-
-    def _setup_input_bundle(self):
-        pass
 
 
 class FileUploader(HttpLocust):
