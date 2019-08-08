@@ -2,7 +2,7 @@ from unittest import TestCase
 
 import requests
 
-from config import secrets
+from locust.config import secrets
 
 AUTH_BROKER_URL = 'https://danielvaughan.eu.auth0.com/oauth/token'
 BASE_API_URL = 'http://api.ingest.dev.data.humancellatlas.org'
