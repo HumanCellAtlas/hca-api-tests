@@ -24,7 +24,8 @@ class Authenticator:
         logging.info('Stopping auth session...')
 
     def setup_token_manager(self, private_key_file_path) -> TokenManager:
-        token_client = self.setup_from_file(private_key_file_path)
+        token_client = S2STokenClient()
+        token_client.setup_from_file(private_key_file_path)
         token_manager = TokenManager(token_client)
         return token_manager
 
