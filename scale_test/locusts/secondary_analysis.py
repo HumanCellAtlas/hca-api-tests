@@ -7,13 +7,13 @@ from collections import deque
 
 import logging
 import requests
-from locust import TaskSet, HttpLocust, task
+from locust import TaskSet, HttpLocust, TaskSequence, task, seq_task
 
 # sys.path setup needs to happen before import of common module
 sys.path.append(os.getcwd())
 from scale_test.common.auth0 import Authenticator
 
-DEFAULT_FILE_UPLOAD_URL = 'http://localhost:8888/v1'
+DEFAULT_FILE_UPLOAD_URL = 'http://localhost:8070/v1'
 DEFAULT_KEY_FILE_PATH = '/data/secrets/key.json'
 
 BASE_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
@@ -23,8 +23,10 @@ FILE_DIRECTORY = f'{BASE_DIRECTORY}/files/secondary_analysis'
 class Resource(object):
 
     _links = None
+    _data = None
 
-    def __init__(self, links):
+    def __init__(self, data, links):
+        self._data = data
         self._links = links
 
     def get_link(self, path):
@@ -99,24 +101,41 @@ class CoreClient:
     def __init__(self, client):
         self.client = client
 
-    def create_submission(self) -> Resource:
+    def create_submission(self, name='create new submission') -> Resource:
         headers = {'Authorization': f'Bearer {_authenticator.get_token()}'}
-        response = self.client.post('/submissionEnvelopes', headers=headers, json={},
-                                    name='create new submission')
+        response = self.client.post('/submissionEnvelopes', headers=headers, json={}, name=name)
+        return CoreClient.parse_response(response)
+
+    def create_metadata(self, create_link, name='create metadata') -> Resource:
+        headers = {'Authorization': f'Bearer {_authenticator.get_token()}'}
+        response = self.client.post(create_link, headers=headers, json={}, name=name)
+        return CoreClient.parse_response(response)
+
+    def add_output_file_to_process(self, create_link, file_json, name='add output file') -> Resource:
+        headers = {'Authorization': f'Bearer {_authenticator.get_token()}'}
+        response = self.client.put(create_link, headers=headers, json=file_json, name=name)
+        return CoreClient.parse_response(response)
+
+    @staticmethod
+    def parse_response(response) -> Resource:
         response_json = response.json()
         links = response_json.get('_links')
-        submission = None
+        resource = None
         if links:
-            submission = Resource(links)
-        return submission
+            resource = Resource(response_json, links)
+        return resource
 
 
-class SecondarySubmission(TaskSet):
+class SubmitAnalysisMetadata(TaskSequence):
 
-    _core_client = None
+    _core_client: CoreClient
+    _submission: Resource
+    _analysis_process: Resource
 
     def on_start(self):
         self._core_client = CoreClient(self.client)
+        self._submission = None
+        self._analysis_process = None
 
     def on_stop(self):
         _authenticator.end_session()
@@ -124,45 +143,37 @@ class SecondarySubmission(TaskSet):
         _analysis_queue.clear()
 
     @task
-    def setup_analysis(self):
-        submission = self._core_client.create_submission()
-        if submission:
-            _submission_queue.queue(submission)
-            self._add_analysis_to_submission(submission)
-
-    def _add_analysis_to_submission(self, submission: Resource):
-        processes_link = submission.get_link('processes')
-        response = self.client.post(processes_link, json=_dummy_analysis,
-                                    name='add analysis to submission')
-        analysis_json = response.json()
-        links = analysis_json.get('_links')
-        if links:
-            analysis = Resource(links)
-            _analysis_queue.queue(analysis)
-            self._add_file_reference(analysis)
-
-    def _add_file_reference(self, analysis: Resource):
-        file_reference_link = analysis.get_link('add-file-reference')
-        for dummy_analysis_file in _dummy_analysis_files:
-            self.client.put(file_reference_link, json=dummy_analysis_file,
-                            name="add file reference")
-
-
-class FileUpload(TaskSet):
-
-    def on_start(self):
-        pass
+    @seq_task(1)
+    def create_analysis_submission(self):
+        submission = self._core_client.create_submission(name='create analysis submission')
+        self._submission = submission
 
     @task
-    def upload_files(self):
-        submission = _submission_queue.wait_for_resource()
+    @seq_task(2)
+    def add_analysis_process_to_submission(self):
+        processes_link = self._submission.get_link('processes')
+        self._analysis_process = self._core_client.create_metadata(processes_link, name='create analysis process')
+
+    @task  # 30 files per analysis process
+    @seq_task(3)
+    def add_file_reference_to_analysis_process(self):
+        file_reference_link = self._analysis_process.get_link('add-file-reference')
+        for dummy_analysis_file in _dummy_analysis_files:
+            self._core_client.add_output_file_to_process(file_reference_link,
+                                                         dummy_analysis_file,
+                                                         name="add analysis output file")
+
+    @task
+    @seq_task(4)
+    def upload_analysis_files(self):
+        submission = self._submission
         upload_area_uuid = None
         submission_link = submission.get_link('self')
         while not upload_area_uuid:
             upload_area_uuid = self._get_upload_area_uuid(submission_link)
             if not upload_area_uuid:
                 time.sleep(3)
-        FileUpload._upload_dummy_files(upload_area_uuid)
+        self._upload_dummy_files(upload_area_uuid)
 
     def _get_upload_area_uuid(self, submission_link):
         upload_area_uuid = None
@@ -174,8 +185,7 @@ class FileUpload(TaskSet):
                 upload_area_uuid = staging_area_uuid.get('uuid')
         return upload_area_uuid
 
-    @staticmethod
-    def _upload_dummy_files(upload_area_uuid):
+    def _upload_dummy_files(self, upload_area_uuid):
         upload_url = f'{_file_upload_base_url}/area/{upload_area_uuid}/files'
         logging.info(f'uploading dummy files to [{upload_url}]...')
         for _dummy_analysis_file in _dummy_analysis_files:
@@ -186,15 +196,9 @@ class FileUpload(TaskSet):
             requests.put(upload_url, json=file_json)
 
 
-class GreenBox(HttpLocust):
+class SecondarySubmission(TaskSequence):
+    tasks = [SubmitAnalysisMetadata]
+
+
+class GreenBoxUser(HttpLocust):
     task_set = SecondarySubmission
-
-    def setup(self):
-        pass
-
-    def _setup_input_bundle(self):
-        pass
-
-
-class FileUploader(HttpLocust):
-    task_set = FileUpload
