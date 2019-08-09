@@ -9,12 +9,10 @@ DEFAULT_KEY_FILE_PATH = "/data/secret/key.json"
 class Authenticator:
 
     def __init__(self, private_key_file_path):
-        self._access_token = None
         self.token_manager = Authenticator.setup_token_manager(private_key_file_path)
 
     def start_session(self):
         logging.info('Starting auth session...')
-        self._access_token = self.token_manager.get_token()
 
     def get_token(self):
         return self.token_manager.get_token()

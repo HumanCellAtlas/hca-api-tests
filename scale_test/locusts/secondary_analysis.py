@@ -11,9 +11,10 @@ from locust import TaskSet, HttpLocust, task
 
 # sys.path setup needs to happen before import of common module
 sys.path.append(os.getcwd())
-from common.auth0 import Authenticator
+from scale_test.common.auth0 import Authenticator
 
 DEFAULT_FILE_UPLOAD_URL = 'http://localhost:8888/v1'
+DEFAULT_KEY_FILE_PATH = '/data/secrets/key.json'
 
 BASE_DIRECTORY = os.path.abspath(os.path.dirname(__file__))
 FILE_DIRECTORY = f'{BASE_DIRECTORY}/files/secondary_analysis'
@@ -88,9 +89,9 @@ for index in range(1, 31):
 
 
 _file_upload_base_url = os.environ.get('FILE_UPLOAD_URL', DEFAULT_FILE_UPLOAD_URL)
+_private_key_file_path = os.environ.get('KEY_FILE_PATH', DEFAULT_KEY_FILE_PATH)
 
-
-_authenticator = Authenticator()
+_authenticator = Authenticator(_private_key_file_path)
 
 
 class CoreClient:
