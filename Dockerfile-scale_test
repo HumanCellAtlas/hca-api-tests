@@ -1,14 +1,17 @@
 FROM python:3.7-slim
 
-WORKDIR scale_test
-COPY scale_test/common ./common
-COPY scale_test/locusts/files ./locusts/files
-COPY scale_test/locusts/secondary_analysis.py ./locusts
+WORKDIR /app
+
+ADD scale_test /app/scale_test
 
 RUN pip install locust
 
 ENV FILE_UPLOAD_URL=http://localhost:8888/v1
 ENV HOST_URL=http://localhost:8080
+
+ENV NUM_USERS=20
+ENV HATCH_RATE=1
+ENV TEST_DURATION_MINUTES=10
 
 EXPOSE 8089
 CMD locust --host=${HOST_URL} -f scale_test/secondary_analysis.py --csv=results
