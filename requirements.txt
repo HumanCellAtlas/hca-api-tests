@@ -1,8 +1,8 @@
-certifi==2018.4.16
-chardet==3.0.4
-idna==2.7
-requests==2.19.1
-urllib3==1.23
-locustio==0.8.1
+certifi
+chardet
+idna
+requests
+urllib3
+locustio
 hca>=4.1.0
 -e "git+https://github.com/HumanCellAtlas/ingest-client.git@49535ae#egg=hca_ingest"
