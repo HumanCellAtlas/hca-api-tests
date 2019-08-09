@@ -32,31 +32,6 @@ class Resource(object):
     def get_link(self, path):
         return self._links[path]['href']
 
-
-class ResourceQueue:
-
-    def __init__(self):
-        self._queue = deque()
-
-    def queue(self, resource: Resource):
-        self._queue.append(resource)
-
-    def wait_for_resource(self):
-        submission = self._queue.popleft() if len(self._queue) > 0 else None
-        while not submission:
-            time.sleep(0.5)
-            submission = self._queue.popleft() if len(self._queue) > 0 else None
-        return submission
-
-    def clear(self):
-
-        if len(self._queue) > 0:
-            self._queue.clear()
-
-
-_submission_queue = ResourceQueue()
-_analysis_queue = ResourceQueue()
-
 with open(f'{FILE_DIRECTORY}/analysis.json') as analysis_file:
     _dummy_analysis = json.load(analysis_file)
     
