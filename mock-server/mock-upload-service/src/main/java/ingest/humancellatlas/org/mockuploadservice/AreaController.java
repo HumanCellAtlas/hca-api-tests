@@ -2,13 +2,15 @@ package ingest.humancellatlas.org.mockuploadservice;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
+import ingest.humancellatlas.org.mockuploadservice.model.MockValidationId;
+import lombok.AllArgsConstructor;
+import lombok.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import javax.websocket.server.PathParam;
 import java.net.URI;
 import java.util.UUID;
 
@@ -17,15 +19,14 @@ import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
 @RestController
 @RequestMapping("area")
+@AllArgsConstructor
 public class AreaController {
 
+    private final @NonNull MessageSender messageSender;
+    private final @NonNull MockFileValidator mockFileValidator;
+    private final @NonNull ObjectMapper objectMapper;
+
     private static final Logger LOGGER = LoggerFactory.getLogger(AreaController.class);
-
-    @Autowired
-    private ObjectMapper objectMapper;
-
-    @Autowired
-    private MessageQueue messageQueue;
 
     @PostMapping(value="/{uuid}", produces=APPLICATION_JSON_VALUE)
     public ResponseEntity<ObjectNode> createUploadArea(
@@ -42,25 +43,18 @@ public class AreaController {
     public ResponseEntity validateFile(@PathVariable("areaUuid") String areaUuid,
             @PathVariable("fileName") String fileName) {
         LOGGER.info(format("File validation requested for [%s in %s]...", fileName, areaUuid));
-        String validationId = UUID.randomUUID().toString();
-        ObjectNode response = objectMapper.createObjectNode();
-        response.put("validation_id", validationId);
-        messageQueue.sendValidationStatus(response.deepCopy());
-        return ResponseEntity.ok().body(response);
+        String jobId = UUID.randomUUID().toString();
+        mockFileValidator.addJob(jobId, fileName);
+        return ResponseEntity.ok().body(new MockValidationId(jobId));
     }
 
     @PutMapping(value="/{areaUuid}/files", consumes=APPLICATION_JSON_VALUE)
     public void uploadFile(@PathVariable("areaUuid") String areaUuid,
             @RequestBody FileMetadata file) {
         String fileName = file.getFileName();
-        LOGGER.info(format("Uploading file [%s] to [%s]...", fileName, areaUuid));
-        ObjectNode fileStagedEvent = objectMapper.createObjectNode();
-        fileStagedEvent
-                .put("url", format("s3://sample-bucket/%s/%s", areaUuid, fileName))
-                .put("name", fileName)
-                .put("upload_area_id", areaUuid)
-                .put("content_type", file.getContentType());
-        messageQueue.sendFileStagedNotification(fileStagedEvent);
+        String contentType = file.getContentType();
+        LOGGER.info(format("Uploading file [%s] with content type [%s] to [%s]...", fileName, contentType, areaUuid));
+        messageSender.sendFileStagedNotification(areaUuid, fileName, contentType);
     }
 
 }
