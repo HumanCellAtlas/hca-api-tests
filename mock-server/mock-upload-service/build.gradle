@@ -29,5 +29,6 @@ repositories {
 dependencies {
     compileOnly('org.projectlombok:lombok')
     compile('org.springframework.boot:spring-boot-starter-web')
+    compile('org.json:json:20180813')
     testCompile('org.springframework.boot:spring-boot-starter-test')
 }
