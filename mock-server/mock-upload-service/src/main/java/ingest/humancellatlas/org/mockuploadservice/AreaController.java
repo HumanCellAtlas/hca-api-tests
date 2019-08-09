@@ -1,10 +1,12 @@
 package ingest.humancellatlas.org.mockuploadservice;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ObjectNode;
 import ingest.humancellatlas.org.mockuploadservice.model.MockValidationId;
 import lombok.AllArgsConstructor;
 import lombok.NonNull;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,25 +20,26 @@ import static java.lang.String.format;
 import static org.springframework.http.MediaType.APPLICATION_JSON_VALUE;
 
 @RestController
-@RequestMapping("area")
+@RequestMapping("v1/area")
 @AllArgsConstructor
 public class AreaController {
 
     private final @NonNull MessageSender messageSender;
     private final @NonNull MockFileValidator mockFileValidator;
-    private final @NonNull ObjectMapper objectMapper;
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AreaController.class);
 
     @PostMapping(value="/{uuid}", produces=APPLICATION_JSON_VALUE)
-    public ResponseEntity<ObjectNode> createUploadArea(
+    public ResponseEntity<String> createUploadArea(
             @PathVariable("uuid") String submissionUuid) {
         LOGGER.info(format("Upload Area creation requested for [%s]...", submissionUuid));
-        ObjectNode response = objectMapper.createObjectNode();
+        JSONObject response = json();
         String uploadAreaUuid = UUID.randomUUID().toString();
         String uploadAreaUri = format("s3://org-humancellatlas-upload-dev/%s/", uploadAreaUuid);
+
         response.put("uri", uploadAreaUri);
-        return ResponseEntity.created(URI.create(uploadAreaUri)).body(response);
+
+        return ResponseEntity.created(URI.create(uploadAreaUri)).body(response.toString());
     }
 
     @PutMapping("/{areaUuid}/{fileName}/validate")
@@ -57,4 +60,7 @@ public class AreaController {
         messageSender.sendFileStagedNotification(areaUuid, fileName, contentType);
     }
 
+    private JSONObject json() {
+        return new JSONObject();
+    }
 }

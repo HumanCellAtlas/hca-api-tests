@@ -70,15 +70,15 @@ public class MessageSender {
 
     private URI configureValidationResultsUri() {
         return UriComponentsBuilder.fromUri(this.ingestUri)
-                .path("messaging")
-                .path("fileValidationResult")
+                .pathSegment("messaging")
+                .pathSegment("fileValidationResult")
                 .build().toUri();
     }
 
     private URI configureFileStagedNotificationUri() {
         return UriComponentsBuilder.fromUri(this.ingestUri)
-                .path("messaging")
-                .path("fileUploadInfo")
+                .pathSegment("messaging")
+                .pathSegment("fileUploadInfo")
                 .build().toUri();
     }
 }
