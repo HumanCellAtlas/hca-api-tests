@@ -57,7 +57,7 @@ def _create_test_file(name):
 _dummy_analysis_files = []
 _base_name = 'ERR16300'
 for index in range(1, 31):
-    name = f'{_base_name}{"%02d" % index}.fastq.gz'
+    name = f'{_base_name}{"%02d" % index}.matrix'
     _dummy_analysis_files.append(_create_test_file(name))
 
 _file_upload_base_url = os.environ.get('FILE_UPLOAD_URL', DEFAULT_FILE_UPLOAD_URL)
