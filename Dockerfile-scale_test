@@ -15,4 +15,4 @@ ENV HATCH_RATE=1
 ENV TEST_DURATION_MINUTES=10
 
 EXPOSE 8089
-CMD locust --host=${TARGET_HOST_URL} -f scale_test/secondary_analysis.py --csv=results
+CMD locust --host=${TARGET_HOST_URL} -f /app/scale_test/locusts/secondary_analysis.py --csv=results
