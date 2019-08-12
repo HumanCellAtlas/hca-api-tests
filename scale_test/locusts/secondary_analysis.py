@@ -3,7 +3,6 @@ import json
 import os
 import sys
 import time
-from collections import deque
 
 import logging
 import requests
@@ -21,7 +20,6 @@ FILE_DIRECTORY = f'{BASE_DIRECTORY}/files/secondary_analysis'
 
 
 class Resource(object):
-
     _links = None
     _data = None
 
@@ -32,9 +30,7 @@ class Resource(object):
     def get_link(self, path):
         return self._links[path]['href']
 
-with open(f'{FILE_DIRECTORY}/analysis.json') as analysis_file:
-    _dummy_analysis = json.load(analysis_file)
-    
+
 with open(f'{FILE_DIRECTORY}/analysis.json') as analysis_file:
     _dummy_analysis = json.load(analysis_file)
 
@@ -64,7 +60,6 @@ for index in range(1, 31):
     name = f'{_base_name}{"%02d" % index}.fastq.gz'
     _dummy_analysis_files.append(_create_test_file(name))
 
-
 _file_upload_base_url = os.environ.get('FILE_UPLOAD_URL', DEFAULT_FILE_UPLOAD_URL)
 _private_key_file_path = os.environ.get('KEY_FILE_PATH', DEFAULT_KEY_FILE_PATH)
 
@@ -81,9 +76,9 @@ class CoreClient:
         response = self.client.post('/submissionEnvelopes', headers=headers, json={}, name=name)
         return CoreClient.parse_response(response)
 
-    def create_metadata(self, create_link, name='create metadata') -> Resource:
+    def create_metadata(self, create_link, metadata_json, name='create metadata') -> Resource:
         headers = {'Authorization': f'Bearer {_authenticator.get_token()}'}
-        response = self.client.post(create_link, headers=headers, json={}, name=name)
+        response = self.client.post(create_link, headers=headers, json=metadata_json, name=name)
         return CoreClient.parse_response(response)
 
     def add_output_file_to_process(self, create_link, file_json, name='add output file') -> Resource:
@@ -102,7 +97,6 @@ class CoreClient:
 
 
 class SubmitAnalysisMetadata(TaskSequence):
-
     _core_client: CoreClient
     _submission: Resource
     _analysis_process: Resource
@@ -114,8 +108,6 @@ class SubmitAnalysisMetadata(TaskSequence):
 
     def on_stop(self):
         _authenticator.end_session()
-        _submission_queue.clear()
-        _analysis_queue.clear()
 
     @task
     @seq_task(1)
@@ -127,7 +119,7 @@ class SubmitAnalysisMetadata(TaskSequence):
     @seq_task(2)
     def add_analysis_process_to_submission(self):
         processes_link = self._submission.get_link('processes')
-        self._analysis_process = self._core_client.create_metadata(processes_link, name='create analysis process')
+        self._analysis_process = self._core_client.create_metadata(processes_link, _dummy_analysis, name='create analysis process')
 
     @task  # 30 files per analysis process
     @seq_task(3)
