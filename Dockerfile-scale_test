@@ -4,7 +4,7 @@ WORKDIR /app
 
 ADD scale_test /app/scale_test
 
-RUN pip install locust
+RUN cd scale_test && pip install -r requirements.txt
 
 ENV KEY_FILE_PATH=/data/secrets/key.json
 ENV FILE_UPLOAD_URL=http://localhost:8888/v1
